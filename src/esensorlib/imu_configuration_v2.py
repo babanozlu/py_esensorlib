@@ -34,6 +34,13 @@ KULLANIM:
 3. Seçenek 1'i seç (Flash'a kaydet)
 4. Artık ayarlar kalıcı!
 
+HAZIR PROFİLLER (FILTER_PROFILES.md dosyasına bak):
+- Profil 0: ULTRA STABİL  (100Hz, k128_fc50)  - Liman/test
+- Profil 1: ÇOK STABİL    (125Hz, k64_fc50)   - Gemi/deniz ⭐ ŞU AN
+- Profil 2: DENGELİ       (200Hz, mv_avg32)   - Genel
+- Profil 3: HIZLI         (500Hz, mv_avg8)    - Manevra
+- Profil 4: ÇOK HIZLI     (1000Hz, mv_avg4)   - Drone
+
 NOT: Bu ayarlar flash'a kaydedilir ve güç kesilse bile kalır.
      Orientation dosyasındaki ayarlar ise geçicidir (her çalıştırmada).
 
@@ -146,7 +153,7 @@ class IMUConfigurator:
         # Trade-off: Yüksek Hz = Hızlı tepki ama daha fazla gürültü
         #            Düşük Hz  = Daha stabil ama yavaş tepki
         # ----------------------------------------------------------------------------
-        OUTPUT_RATE = 100  # ⭐ ŞU AN: 100 Hz (deniz için ideal)
+        OUTPUT_RATE = 125  # ⭐ ŞU AN: 125 Hz (dengeli, gemi için ideal)
         
         # ----------------------------------------------------------------------------
         # FILTER SELECTION (Filtre Seçimi) - Gürültü azaltma
@@ -206,13 +213,19 @@ class IMUConfigurator:
         #   k64_fc400 < k64_fc200 < k64_fc100 < k64_fc50
         #   k128_fc400 < k128_fc200 < k128_fc100 < k128_fc50 ⭐ EN GÜÇLÜ
         # ----------------------------------------------------------------------------
-        FILTER_SEL = 'k128_fc50'  # ⭐ ŞU AN: Kaiser 128-tap, 50Hz kesim (maksimum stabilite)
+        FILTER_SEL = 'k64_fc50'  # ⭐ ŞU AN: Kaiser 64-tap, 50Hz kesim (GEMİ İÇİN İDEAL!)
+        
+        # NEDEN k64_fc50?
+        # - Deniz dalgaları 0.1-2 Hz → Geçer ✅
+        # - Motor/rüzgar 10-100 Hz → Kesilir ❌
+        # - Gecikme: 256ms (gemi için kabul edilebilir)
+        # - Profesyonel kalite, pürüzsüz
         
         # DİĞER POPÜLER SEÇİMLER (İstersen değiştirebilirsin):
-        # FILTER_SEL = 'mv_avg64'    # Güçlü ama daha hızlı (320ms gecikme)
-        # FILTER_SEL = 'k64_fc50'    # Orta güç, orta hız (320ms gecikme)
-        # FILTER_SEL = 'mv_avg32'    # Dengeli (160ms gecikme)
-        # FILTER_SEL = 'k128_fc100'  # Biraz daha hızlı tepki (640ms gecikme)
+        # FILTER_SEL = 'k128_fc50'   # Daha güçlü ama yavaş (512ms)
+        # FILTER_SEL = 'mv_avg64'    # Basit ama etkili (256ms)
+        # FILTER_SEL = 'k64_fc100'   # Daha hızlı ama az filtre (256ms)
+        # FILTER_SEL = 'mv_avg32'    # Hafif (128ms)
         
         # ----------------------------------------------------------------------------
         # DİĞER AYARLAR (Genelde değiştirmeye gerek yok)

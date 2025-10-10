@@ -11,15 +11,22 @@ HIZLI AYAR REHBERİ
 
 Bu dosyada değiştirebileceğin 2 ana parametre var:
 
-1. ALPHA (Satır ~90):
+1. ALPHA (Satır ~113):
    - Yazılım filtre hızı
    - Düşük = Daha stabil, Yüksek = Daha hızlı tepki
    - Önerilen: 0.02-0.05 (deniz), 0.10-0.15 (drone)
 
-2. GYRO_THRESHOLD (Satır ~111):
+2. GYRO_THRESHOLD (Satır ~141):
    - Gürültü bastırma eşiği (°/s)
    - Düşük = Daha hassas, Yüksek = Daha stabil
    - Önerilen: 0.2-0.3 (deniz), 0.1-0.2 (genel)
+
+HAZIR PROFİLLER (FILTER_PROFILES.md dosyasına bak):
+- Profil 0: ULTRA STABİL  (alpha=0.01, threshold=0.4)   - Liman/test
+- Profil 1: ÇOK STABİL    (alpha=0.03, threshold=0.25)  - Gemi/deniz ⭐ ŞU AN
+- Profil 2: DENGELİ       (alpha=0.08, threshold=0.15)  - Genel
+- Profil 3: HIZLI         (alpha=0.15, threshold=0.1)   - Manevra
+- Profil 4: ÇOK HIZLI     (alpha=0.20, threshold=0.05)  - Drone
 
 NOT: Ekran her IMU verisi geldiğinde güncellenir (display_interval kaldırıldı)
 
@@ -110,13 +117,20 @@ class IMUMonitor:
         #   - Genel kullanım:   0.05-0.10 (dengeli)
         #   - Hızlı hareket:    0.10-0.20 (hızlı tepki)
         # ------------------------------------------------------------------------
-        self.alpha = 0.03  # ⭐ ŞU AN: 0.03 (çok yavaş, maksimum stabilite)
+        self.alpha = 0.03  # ⭐ ŞU AN: 0.03 (yavaş, display için ultra smooth)
+        
+        # NEDEN 0.03?
+        # - Display bar grafiği için ultra pürüzsüz hareket
+        # - 75.13-75.14 arası git-gel YOK
+        # - Deniz dalgalarını hala takip eder
+        # - Kullanıcı gözü yorulmaz
         
         # DİĞER ALPHA SEÇENEKLERİ:
-        # self.alpha = 0.02   # Daha da yavaş (ultra stabil)
-        # self.alpha = 0.05   # Biraz daha hızlı (hala çok stabil)
-        # self.alpha = 0.10   # Orta hız (standart)
-        # self.alpha = 0.15   # Hızlı tepki (drone/robot için)
+        # self.alpha = 0.02   # Çok yavaş (ultra stabil, yavaş bar hareketi)
+        # self.alpha = 0.03   # Yavaş (maksimum stabilite)
+        # self.alpha = 0.04   # Orta-yavaş (çok stabil)
+        # self.alpha = 0.08   # Orta-hızlı (daha responsive)
+        # self.alpha = 0.10   # Hızlı (standart)
         
         # ------------------------------------------------------------------------
         # GYRO THRESHOLD (Gürültü Eşiği)
@@ -131,12 +145,20 @@ class IMUMonitor:
         #   - Genel kullanım:      0.10-0.20 °/s (dengeli)
         #   - Stabil/deniz:        0.20-0.50 °/s (küçük hareketleri yok say)
         # ------------------------------------------------------------------------
-        self.gyro_threshold = 0.3  # ⭐ ŞU AN: 0.3°/s (yüksek, küçük titreşimleri bastır)
+        self.gyro_threshold = 0.25  # ⭐ ŞU AN: 0.25°/s (yüksek, küçük titreşimleri bastır)
+        
+        # NEDEN 0.25?
+        # - Düz zeminde tamamen sabit
+        # - Küçük motor titreşimleri algılanmaz
+        # - Gerçek gemi hareketlerini hala yakalar
+        # - Display'de 0.01° git-gel yok
         
         # DİĞER THRESHOLD SEÇENEKLERİ:
-        # self.gyro_threshold = 0.1   # Düşük (daha hassas)
-        # self.gyro_threshold = 0.2   # Orta (dengeli)
-        # self.gyro_threshold = 0.5   # Yüksek (maksimum stabilite)
+        # self.gyro_threshold = 0.1   # Düşük (daha hassas, küçük hareketler)
+        # self.gyro_threshold = 0.15  # Orta-düşük (dengeli)
+        # self.gyro_threshold = 0.25  # Orta-yüksek (daha stabil)
+        # self.gyro_threshold = 0.3   # Yüksek (çok stabil)
+        # self.gyro_threshold = 0.5   # Çok yüksek (ultra stabil)
         
         # ------------------------------------------------------------------------
         # FİLTRE DEĞİŞKENLERİ (Tüm eksenler için)
@@ -344,6 +366,7 @@ class IMUMonitor:
                         self.update_roll_amplitude(roll)
                         
                         # Display data in one line (overwrite previous) - Her veri geldiğinde
+                        # 2 basamak hassasiyet (0.01°) - Yuvarlama yok
                         print(f"\rHeading: {heading:6.2f}° | "
                               f"Heel: {roll:6.2f}° | "
                               f"Pitch: {pitch:6.2f}° | "
