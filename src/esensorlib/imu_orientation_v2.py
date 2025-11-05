@@ -28,7 +28,7 @@ HAZIR PROFİLLER (FILTER_PROFILES.md dosyasına bak):
 - Profil 3: HIZLI         (alpha=0.15, threshold=0.1)   - Manevra
 - Profil 4: ÇOK HIZLI     (alpha=0.20, threshold=0.05)  - Drone
 
-NOT: Ekran her IMU verisi geldiğinde güncellenir (display_interval kaldırıldı)
+NOT: Buffer temizleme özelliği eklendi - gerçek zamanlı performans için
 
 NOT: IMU donanım filtresi (OUTPUT_RATE ve FILTER_SEL) için
      imu_configuration_v2.py dosyasını kullan ve flash'a kaydet.
@@ -45,7 +45,7 @@ from esensorlib import sensor_device
 
 
 class IMUMonitor:
-    def __init__(self, port='COM8', speed=460800):
+    def __init__(self, port='/dev/ttyLP2', speed=460800):
         """
         Initialize IMU Monitor
         
@@ -61,8 +61,12 @@ class IMUMonitor:
         print(f"{'='*80}")
         print(f"\nInitializing IMU on {port} @ {speed} baud...")
         
-        # Initialize IMU device
+        # Initialize IMU device with optimized settings
         self.imu = sensor_device.SensorDevice(port=port, speed=speed)
+
+        # Optimize serial port for real-time operation (if possible)
+        # Note: SensorDevice encapsulates the serial connection internally
+        # We can't directly access serial port settings from here
         
         # Get device info
         print(f"\nDevice Information:")
@@ -117,7 +121,7 @@ class IMUMonitor:
         #   - Genel kullanım:   0.05-0.10 (dengeli)
         #   - Hızlı hareket:    0.10-0.20 (hızlı tepki)
         # ------------------------------------------------------------------------
-        self.alpha = 0.03  # ⭐ ŞU AN: 0.03 (yavaş, display için ultra smooth)
+        self.alpha = 0.15  # ⭐ ŞU AN: 0.03 (yavaş, display için ultra smooth)
         
         # NEDEN 0.03?
         # - Display bar grafiği için ultra pürüzsüz hareket
@@ -190,8 +194,9 @@ class IMUMonitor:
         
         print(f"\nReady to monitor!")
         print(f"Starting data acquisition... (Press CTRL+C to stop)")
-        print(f"\nNote: Using pre-configured settings from flash memory")
-        print(f"      To change configuration, run imu_configuration_v2.py")
+        print(f"\nNote: Using FILTERED version with buffer clearing")
+        print(f"      Alpha: {self.alpha}, Gyro Threshold: {self.gyro_threshold}°/s")
+        print(f"      To change hardware configuration, run imu_configuration_v2.py")
         print(f"\n{'='*80}\n")
         
     def calculate_roll_period(self, roll, timestamp):
@@ -323,59 +328,78 @@ class IMUMonitor:
         try:
             # Put IMU in sampling mode
             self.imu.goto('sampling')
-            
+
+            # Note: We can't directly clear buffer with SensorDevice
+            # We'll discard old data in the main loop instead
+
             last_time = time.time()
             start_time = time.time()
-            
+            display_counter = 0
+
             # ====================================================================
-            # EKRAN GÜNCELLEME - Her veri geldiğinde güncelle
+            # GERÇEK ZAMANLI VERİ OKUMA - Buffer temizleme ve hızlı okuma
             # ====================================================================
-            # Ekran display_interval kaldırıldı, her IMU verisi geldiğinde güncellenir
-            # Daha hızlı ve güncel görüntü
+            # Serial buffer sürekli temizlenir, sadece en son veri kullanılır
             # ====================================================================
-            
+
             while True:
-                # Read sensor data
-                data = self.imu.read_sample()
+                # AGGRESSIVE BUFFER CLEARING - Always get the LATEST data
+                # Read all available data but use only the last one
+                latest_data = None
+                data_count = 0
+
+                # Read all pending data - max 10 samples to avoid infinite loop
+                for _ in range(10):
+                    data = self.imu.read_sample()
+                    if data:
+                        latest_data = data
+                        data_count += 1
+                    else:
+                        break  # No more data available
+
+                # Use only the latest data (discard old buffered data)
+                # If no new data, just continue
+                data = latest_data if latest_data else self.imu.read_sample()
                 if data:
                     current_time = time.time()
                     dt = current_time - last_time
                     timestamp = current_time - start_time
-                    
+                    display_counter += 1
+
                     # Extract gyro and accelerometer data
-                    # burst_fields: ('tempc32', 'gyro32_X', 'gyro32_Y', 'gyro32_Z', 
+                    # burst_fields: ('tempc32', 'gyro32_X', 'gyro32_Y', 'gyro32_Z',
                     #                'accl32_X', 'accl32_Y', 'accl32_Z')
                     if len(data) >= 7:
                         tempc = data[0]
                         gx, gy, gz = data[1:4]  # deg/s
                         ax, ay, az = data[4:7]  # mG (milliG)
-                        
+
                         # Convert mG to G
                         ax = ax / 1000.0
                         ay = ay / 1000.0
                         az = az / 1000.0
-                        
+
                         # Calculate orientation
                         roll, pitch, heading = self.calculate_orientation(ax, ay, az, gx, gy, gz, dt)
-                        
+
                         # Calculate accelerations
                         surge, sway, heave = self.calculate_acceleration(ax, ay, az)
-                        
+
                         # Update roll period and amplitude
                         self.calculate_roll_period(roll, timestamp)
                         self.update_roll_amplitude(roll)
-                        
-                        # Display data in one line (overwrite previous) - Her veri geldiğinde
-                        # 2 basamak hassasiyet (0.01°) - Yuvarlama yok
-                        print(f"\rHeading: {heading:6.2f}° | "
+
+                        # Display latest data immediately - no delay
+                        # Show buffer info for debugging lag
+                        print(f"\r[BUF {data_count:2d}] Heading: {heading:6.2f}° | "
                               f"Heel: {roll:6.2f}° | "
                               f"Pitch: {pitch:6.2f}° | "
                               f"Roll Period: {self.roll_period:4.1f}s | "
-                              f"Roll Amp Port/Stbd: {self.roll_amp_port:5.2f}°/{self.roll_amp_stbd:5.2f}° | "
+                              f"Roll Amp P/S: {self.roll_amp_port:5.2f}°/{self.roll_amp_stbd:5.2f}° | "
                               f"Surge: {surge:5.2f} | Sway: {sway:5.2f} | Heave: {heave:5.2f} | "
-                              f"Temp: {tempc:5.1f}°C", 
+                              f"Temp: {tempc:5.1f}°C",
                               end='', flush=True)
-                    
+
                     last_time = current_time
                 
         except KeyboardInterrupt:
@@ -393,7 +417,7 @@ class IMUMonitor:
 
 if __name__ == "__main__":
     # Configuration parameters
-    PORT = 'COM8'      # Change to your COM port (e.g., 'COM8', '/dev/ttyUSB0')
+    PORT = '/dev/ttyLP2'      # Change to your COM port (e.g., 'COM8', '/dev/ttyUSB0')
     BAUDRATE = 460800  # Baudrate (should match IMU configuration)
     
     print("\n" + "="*80)
@@ -426,4 +450,3 @@ if __name__ == "__main__":
         import traceback
         traceback.print_exc()
         sys.exit(1)
-

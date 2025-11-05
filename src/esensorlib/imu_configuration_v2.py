@@ -54,7 +54,7 @@ from esensorlib import sensor_device
 
 
 class IMUConfigurator:
-    def __init__(self, port='COM8', speed=460800):
+    def __init__(self, port='/dev/ttyLP2', speed=460800):
         """
         Initialize IMU Configurator
         
@@ -153,7 +153,7 @@ class IMUConfigurator:
         # Trade-off: Yüksek Hz = Hızlı tepki ama daha fazla gürültü
         #            Düşük Hz  = Daha stabil ama yavaş tepki
         # ----------------------------------------------------------------------------
-        OUTPUT_RATE = 125  # ⭐ ŞU AN: 125 Hz (dengeli, gemi için ideal)
+        OUTPUT_RATE = 250  # ⭐ ŞU AN: 125 Hz (dengeli, gemi için ideal)
         
         # ----------------------------------------------------------------------------
         # FILTER SELECTION (Filtre Seçimi) - Gürültü azaltma
@@ -213,7 +213,7 @@ class IMUConfigurator:
         #   k64_fc400 < k64_fc200 < k64_fc100 < k64_fc50
         #   k128_fc400 < k128_fc200 < k128_fc100 < k128_fc50 ⭐ EN GÜÇLÜ
         # ----------------------------------------------------------------------------
-        FILTER_SEL = 'k64_fc50'  # ⭐ ŞU AN: Kaiser 64-tap, 50Hz kesim (GEMİ İÇİN İDEAL!)
+        FILTER_SEL = 'k128_fc50'  # ⭐ ŞU AN: Kaiser 64-tap, 50Hz kesim (GEMİ İÇİN İDEAL!)
         
         # NEDEN k64_fc50?
         # - Deniz dalgaları 0.1-2 Hz → Geçer ✅
@@ -463,7 +463,7 @@ class IMUConfigurator:
 
 if __name__ == "__main__":
     # Configuration parameters
-    PORT = 'COM8'       # Change to your COM port
+    PORT = '/dev/ttyLP2'       # Change to your COM port
     BAUDRATE = 460800   # Baudrate (460800 is standard for G366-PDG0)
     
     print("\nIMU Configuration Tool")
